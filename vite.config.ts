@@ -10,6 +10,7 @@ export default defineConfig({
     imports: [
       'vue'
     ],
+    dirs: ["./src/utils/index.ts"],
     dts: fileURLToPath(new URL('./auto-imports.d.ts', import.meta.url)),
     eslintrc: {
       enabled: true,

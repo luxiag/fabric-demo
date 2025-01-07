@@ -17,5 +17,11 @@ export default [
   ...pluginVue.configs["flat/essential"],
   
   {files: ["**/*.vue"], languageOptions: {parserOptions: {parser: tseslint.parser}}},
+  {
+    rules: {
+      // 关闭any限制
+      "@typescript-eslint/no-explicit-any": "off"
+    }
+  }
 
 ];
