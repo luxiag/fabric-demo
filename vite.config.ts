@@ -5,12 +5,23 @@ import { fileURLToPath, URL } from 'node:url'
 
 // https://vite.dev/config/
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    }
+  },
   plugins: [vue(),
   AutoImport({
     imports: [
-      'vue'
+      'vue', {
+        '@/utils/index.ts': [
+          "throttle",
+          "debounce"
+        ]
+      }
+
     ],
-    dirs: ["./src/utils/index.ts"],
+    // dirs: ["./src/utils/index.ts"],
     dts: fileURLToPath(new URL('./auto-imports.d.ts', import.meta.url)),
     eslintrc: {
       enabled: true,
