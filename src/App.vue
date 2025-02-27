@@ -14,168 +14,176 @@
 <script setup lang="ts">
 
 import * as fabric from 'fabric';
+import { v4 as uuid } from 'uuid';
+
+import type { IWorkSpaceCanvas } from './types';
+
+const WorkSpaceCanvasClass = ref<WorkSpaceCanvas | null>(null)
 
 
-let canvas: fabric.Canvas | null = null
-let resizeObserve: ResizeObserver | null = null
-let workspace: HTMLCanvasElement | null = null
 
 
 
-interface IWorkSpaceCanvas {
-  canvasFC: fabric.Canvas | null
-  editorFR: fabric.Rect | null
-  workspaceDom: HTMLCanvasElement | null
-  resizeObserver: ResizeObserver | null,
-  initWorkspace(): void,
-  initCanvasFc(): void,
-  initResizeObserve(): void,
-  setCenterFromObject(obj: fabric.Object): void
-}
+
 
 
 class WorkSpaceCanvas implements IWorkSpaceCanvas {
 
-  private canvasFC: fabric.Canvas | null = null
-  private editorFR: fabric.Rect | null = null
-  private workspaceDom: HTMLCanvasElement | null = null
-  private resizeObserver: ResizeObserver | null = null
+  canvasFC!: fabric.Canvas
+  editorFR!: fabric.Rect
+  workspaceDom: HTMLCanvasElement
+  resizeObserver!: ResizeObserver
+  zoomRatio: number = 1
 
-  constructor(options: { canvasClass: string, workspaceClass: string }) {
+  constructor(options: { canvasClass: string, workspaceClass: string } = { canvasClass: 'canvas', workspaceClass: '.workspace' }) {
+    
     this.workspaceDom = document.querySelector(options.workspaceClass) as HTMLCanvasElement
     this.canvasFC = new fabric.Canvas(options.canvasClass, {
-      // 
       stopContextMenu: true,
-
     })
+    this.initCanvasFC()
+    this.initEditorFR()
+    this.initResizeObserve()
   }
-  initCanvasFc(){
-    if(!this.canvasFC) {
+  initCanvasFC() {
+    if (!this.canvasFC) {
       console.error('canvasFC is null')
       return
     }
-    if(!this.workspaceDom) {
+    if (!this.workspaceDom) {
       console.error('workspaceDom is null')
       return
     }
+
     this.canvasFC.backgroundImage = undefined
+    console.log(this.workspaceDom.offsetHeight, this.workspaceDom.offsetWidth,'initCanvasFc')
     this.canvasFC.setDimensions({ width: this.workspaceDom?.offsetWidth, height: this.workspaceDom?.offsetHeight })
   }
-  initWorkspace() {
+  initEditorFR() {
+    const width = this.workspaceDom.offsetWidth * 0.8 || 900
+    const height = this.workspaceDom.offsetHeight * 0.8 || 1200
     this.editorFR = new fabric.Rect({
       fill: 'rgba(255,255,255,1)',
-      id: 'workspace',
+      id: 'editor',
       strokeWidth: 0,
-      width: 900,
-      height: 1200
-
+      width,
+      height
     })
-    this.editorFR.set('selectable', true);
-    this.editorFR.set('hasControls', true);
+    this.editorFR.set('selectable', false);
+    this.editorFR.set('hasControls', false);
     this.canvasFC?.add(this.editorFR)
   }
   initResizeObserve() {
-    if(!this.workspaceDom) {
+    if (!this.workspaceDom) {
       console.error('workspaceDom is null')
       return
     }
-    if(!this.workspaceDom) {
-      console.error('workspaceDom is null')
+    if (!this.canvasFC) {
+      console.error('canvasFC is null')
       return
     }
     this.resizeObserver = new ResizeObserver(() => {
-      if (!this.canvasFC || !this.workspaceDom) return
-      this.canvasFC.setDimensions({ width: this.workspaceDom.offsetWidth, height: this.workspaceDom.offsetHeight })
-      this.setCenterFromObject(this.editorFR as fabric.Rect)
+      // if (!this.canvasFC || !this.workspaceDom) return
+      // this.canvasFC.setDimensions({ width: this.workspaceDom.offsetWidth, height: this.workspaceDom.offsetHeight })
+      // this.setCenterFromObject(this.editorFR as fabric.Rect)
+      this.resize()
     })
-
+    this.resizeObserver.observe(this.workspaceDom)
   }
   setCenterFromObject(object: fabric.Rect) {
     const objCenter = object.getCenterPoint()
     // viewportTransform
     // [ scaleX, skewX, skewY, scaleY, translateX, translateY ]
-    const viewportTransform = canvas?.viewportTransform
-    if (viewportTransform && canvas) {
-      viewportTransform[4] = canvas.width / 2 - objCenter.x * viewportTransform[0]
-      viewportTransform[5] = canvas.height / 2 - objCenter.y * viewportTransform[3]
-      canvas.setViewportTransform(viewportTransform)
-      canvas.renderAll()
+    const viewportTransform = this.canvasFC?.viewportTransform
+    if (viewportTransform && this.canvasFC) {
+      viewportTransform[4] = this.canvasFC.width / 2 - objCenter.x * viewportTransform[0]
+      viewportTransform[5] = this.canvasFC.height / 2 - objCenter.y * viewportTransform[3]
+      this.canvasFC.setViewportTransform(viewportTransform)
+      this.canvasFC.renderAll()
     }
   }
-}
+  zoomInCanvas() {
+    if (!this.canvasFC) {
+      console.error('canvasFC is null')
+      return
+    }
+    let zoomRatio = this.canvasFC.getZoom()
+    zoomRatio += 0.5
+    const center = this.canvasFC.getCenterPoint()
+    this.canvasFC.zoomToPoint(center, zoomRatio < 0 ? 0.1 : zoomRatio)
+  }
+  zoomOutCanvas() {
+    if (!this.canvasFC) {
+      console.error('canvasFC is null')
+      return
+    }
+    let zoomRatio = this.canvasFC.getZoom()
+    zoomRatio -= 0.5
+    const center = this.canvasFC.getCenterPoint()
+    this.canvasFC.zoomToPoint(center, zoomRatio < 0 ? 0.1 : zoomRatio)
+  }
+  setZoomRatio(ratio: number) {
+    const width = this.workspaceDom.offsetWidth
+    const height = this.workspaceDom.offsetHeight
+    this.canvasFC.setDimensions({ width, height })
+    const center = this.canvasFC.getCenterPoint()
+    this.canvasFC.zoomToPoint(center, ratio)
+    this.setCenterFromObject(this.editorFR)
 
-
-const getDom = () => {
-  workspace = document.querySelector('.workspace') as HTMLCanvasElement
-}
-
-const initBackground = (canvas: fabric.Canvas) => {
-  if (!workspace || !canvas) return
-  canvas.backgroundImage = undefined
-
-  canvas.setDimensions({ width: workspace.offsetWidth, height: workspace.offsetHeight })
-}
-
-const initWorkspace = (canvas: fabric.Canvas) => {
-  const workspace = new fabric.Rect({
-    fill: 'rgba(255,255,255,1)',
-    id: 'workspace',
-    strokeWidth: 0,
-    width: 900,
-    height: 1200
-
-  })
-  workspace.set('selectable', true);
-  workspace.set('hasControls', true);
-  canvas.add(workspace)
-  setCenterFromObject(workspace)
-}
-
-
-
-const setCenterFromObject = (object: fabric.Rect) => {
-  const objCenter = object.getCenterPoint()
-  // viewportTransform
-  // [ scaleX, skewX, skewY, scaleY, translateX, translateY ]
-  const viewportTransform = canvas?.viewportTransform
-  if (viewportTransform && canvas) {
-    viewportTransform[4] = canvas.width / 2 - objCenter.x * viewportTransform[0]
-    viewportTransform[5] = canvas.height / 2 - objCenter.y * viewportTransform[3]
-    canvas.setViewportTransform(viewportTransform)
-    canvas.renderAll()
+    this.zoomRatio = ratio
+    this.editorFR.clone().then(clone => {
+      this.canvasFC.clipPath = clone
+      this.canvasFC.requestRenderAll();
+    });
+  }
+  resize() {
+    const scaleNum = fabric.util.findScaleToFit(this.editorFR, {
+      width: this.workspaceDom?.offsetWidth,
+      height: this.workspaceDom?.offsetHeight
+    })
+    this.setZoomRatio(scaleNum)
   }
 
-}
+  addObject(object: fabric.Object, options?: {
+    event: DragEvent
+  }) {
+    const { event = false } = options || {}
+    object.set({
+      id: uuid()
+    })
 
-const resizeWorkspace = () => {
-  if (!workspace || !canvas) return
-  const width = workspace.offsetWidth
-  const height = workspace.offsetHeight
+    if (event) this.setObjectLocationFromDrag(object, event)
 
-  canvas.setDimensions({ width, height })
-}
-
-const initResizeObserve = () => {
-  if (!workspace) return
-
-  // 监视 Element 内容盒或边框盒或者 SVGElement 边界尺寸的变化。
-  resizeObserve = new ResizeObserver(
-    debounce(() => {
-      resizeWorkspace()
-    }, 50)
-  )
-  resizeObserve.observe(workspace)
+    this.canvasFC?.add(object)
+    this.canvasFC?.setActiveObject(object)
+    this.canvasFC?.renderAll()
+  }
+  setObjectLocationFromDrag(object: fabric.Object, event: DragEvent) {
+    if (!this.canvasFC) {
+      console.error('canvasFC is null')
+      return
+    }
+    const { left, top } = this.canvasFC.getSelectionElement().getBoundingClientRect()
+    if (event.x < left || event.y < top || !object.width) return
+    const position = {
+      ...event,
+      x: event.x - left,
+      y: event.y - top,
+    }
+    // 获取当前位置在画布中的位置
+    const canvasPosition = this.canvasFC.getScenePoint(position)
+    object.set({
+      left: canvasPosition.x,
+      top: canvasPosition.y
+    })
+  }
 }
 
 onMounted(() => {
-  getDom()
-  canvas = new fabric.Canvas('canvas', {
-    stopContextMenu: true,
-  })
-  initBackground(canvas)
-  initWorkspace(canvas)
-  initResizeObserve()
+  WorkSpaceCanvasClass.value = new WorkSpaceCanvas()
 })
+
+
 
 </script>
 <style scoped lang="scss">
@@ -193,9 +201,6 @@ onMounted(() => {
     position: relative;
 
     .workspace-canvas {
-      width: 300px;
-      height: 300px;
-      margin: 0 auto;
       --offsetX: 0px;
       --offsetY: 0px;
       --size: 16px;
